@@ -801,6 +801,12 @@ export interface OcxConfig {
   /** Restore an installed shim after a stable external Codex update replaces it. Default true. */
   codexShimAutoRestore?: boolean;
   /**
+   * Automatic update checks: the npm registry version lookups behind the interactive
+   * update prompt and the 20h background refresh. Explicit `ocx update` and the GUI
+   * update button stay available. Default true.
+   */
+  updateCheck?: boolean;
+  /**
    * Opt-in authless Codex Desktop routing (#1107). On a loopback bind, inject the dedicated
    * `[model_providers.opencodex]` table with `requires_openai_auth = false` instead of the root
    * `openai_base_url` override, so Desktop opens without a ChatGPT login. Default off; ignored on

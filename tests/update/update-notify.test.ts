@@ -7,10 +7,12 @@ import {
   interactiveGuardOk,
   isNewer,
   isSourceBuildVersion,
+  maybeShowUpdatePrompt,
   readVersionCache,
   writeVersionCache,
   type VersionCache,
 } from "../../src/update/notify";
+import { updateCheckEnabled } from "../../src/config/proxy-env";
 import { removeTreeWithRetry } from "../helpers/remove-tree";
 import { repoRoot } from "../helpers/repo-root";
 import { pathToFileURL } from "node:url";
@@ -126,7 +128,7 @@ describe("cli wiring", () => {
 
   test("update prompt runs before the server binds a port", async () => {
     const cli = await readText("src/cli/index.ts");
-    const promptIndex = cli.indexOf("await maybeShowUpdatePrompt()");
+    const promptIndex = cli.indexOf("await maybeShowUpdatePrompt(updateCheckEnabled(loadConfig()))");
     const portIndex = cli.indexOf("let port = await chooseListenPort");
     const serverIndex = cli.search(/\bstartServer\s*\(\s*port\b/);
     // A -1 from `search` would compare "before" every real index and turn the
@@ -161,5 +163,32 @@ describe("cli wiring", () => {
     const dispatch = await readText("src/cli/dispatch.ts");
     expect(dispatch).toContain("\"__refresh-version\": async");
     expect(dispatch).toContain("refreshVersionCache");
+  });
+});
+
+describe("updateCheckEnabled", () => {
+  test("enabled by default", () => {
+    expect(updateCheckEnabled({}, {})).toBe(true);
+  });
+
+  test("config updateCheck: false disables", () => {
+    expect(updateCheckEnabled({ updateCheck: false }, {})).toBe(false);
+  });
+
+  test("OPENCODEX_UPDATE_CHECK=0 disables", () => {
+    expect(updateCheckEnabled({}, { OPENCODEX_UPDATE_CHECK: "0" })).toBe(false);
+  });
+
+  test("other env values do not disable", () => {
+    expect(updateCheckEnabled({}, { OPENCODEX_UPDATE_CHECK: "false" })).toBe(true);
+    expect(updateCheckEnabled({}, { OPENCODEX_UPDATE_CHECK: "1" })).toBe(true);
+  });
+});
+
+describe("maybeShowUpdatePrompt gating", () => {
+  test("a disabled flag returns before any update machinery runs", async () => {
+    // shouldConsider() would consult TTY/install state; a disabled flag must short-
+    // circuit before it, so the promise resolves without touching the version cache.
+    await expect(maybeShowUpdatePrompt(false)).resolves.toBeUndefined();
   });
 });
