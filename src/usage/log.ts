@@ -1,5 +1,5 @@
 import { createHash, type Hash } from "node:crypto";
-import { chmodSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, appendFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { getConfigDir } from "../config";
 import type { CodexAffinityMove, CodexAffinityReason } from "../codex/routing";
@@ -865,12 +865,75 @@ function ensureUsageLogDir(now: number): void {
   ensuredUsageLogDir = { path: dir, checkedAt: now };
 }
 
+/**
+ * Disk-retention cap for `usage.jsonl`.
+ *
+ * The file is append-only metadata with no other compaction, so it grows without bound.
+ * Once it crosses USAGE_LOG_MAX_BYTES it is rewritten down to the newest
+ * USAGE_LOG_TRIM_KEEP_BYTES at a line boundary. The management readers already window
+ * their reads at 64 MiB, so a file at or under the cap is always read whole: dashboards
+ * show one consistent retained window (documented behavior) instead of a silently
+ * sliding one, and disk stays bounded.
+ *
+ * Best-effort: a failed trim never blocks the append. Trim runs at most once per second
+ * alongside the file-permission recheck, so the steady-state cost on the request path is
+ * one branch.
+ */
+export const USAGE_LOG_MAX_BYTES = 64 * 1024 * 1024;
+export const USAGE_LOG_TRIM_KEEP_BYTES = 48 * 1024 * 1024;
+
+function trimUsageLogToRetentionWindow(path: string): void {
+  let size: number;
+  try {
+    size = statSync(path).size;
+  } catch {
+    return; // no file yet (or unreadable) — nothing to trim
+  }
+  if (size <= USAGE_LOG_MAX_BYTES) return;
+  try {
+    const fd = openSync(path, "r");
+    try {
+      // Align forward to the first byte after the next newline so the retained file
+      // starts on a complete JSONL row.
+      let offset = size - USAGE_LOG_TRIM_KEEP_BYTES;
+      if (offset > 0) {
+        const byte = Buffer.alloc(1);
+        while (offset < size) {
+          readSync(fd, byte, 0, 1, offset);
+          offset += 1;
+          if (byte[0] === 0x0a) break;
+        }
+      }
+      const kept = Buffer.alloc(size - offset);
+      readSync(fd, kept, 0, kept.length, offset);
+      const tmp = `${path}.trim-${process.pid}`;
+      writeFileSync(tmp, kept, { mode: 0o600 });
+      renameSync(tmp, path);
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    /* keep appending to the untrimmed file rather than lose usage data */
+  }
+}
+
+let lastTrimCheckAt = 0;
+
+/** Test-only reset of the trim cadence, mirroring the other `*ForTests` seams here. */
+export function resetUsageTrimStateForTests(): void {
+  lastTrimCheckAt = 0;
+}
+
 export function appendUsageEntry(entry: PersistedUsageEntry): void {
   const line = `${JSON.stringify(normalizeUsageEntry(entry))}\n`;
   const path = usageLogPath();
   const now = Date.now();
   const doAppend = (): void => {
     ensureUsageLogDir(now);
+    if (now - lastTrimCheckAt >= 1000) {
+      lastTrimCheckAt = now;
+      trimUsageLogToRetentionWindow(path);
+    }
     const filePermissionsCurrent = usageLogPermissionCheckIsCurrent(ensuredUsageLogFile, path, now);
     appendFileSync(path, line, { encoding: "utf-8", mode: 0o600 });
     if (!filePermissionsCurrent) {

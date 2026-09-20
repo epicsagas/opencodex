@@ -6,6 +6,9 @@ import { join } from "node:path";
 import {
   appendUsageEntry,
   currentUsageLogRevision,
+  USAGE_LOG_MAX_BYTES,
+  USAGE_LOG_TRIM_KEEP_BYTES,
+  resetUsageTrimStateForTests,
   normalizeUsageEntryForTest,
   normalizeClaudeCompatibilityUsageLog,
   normalizePersistedUsageRow,
@@ -1144,5 +1147,47 @@ describe("usage log", () => {
     const readBack = readRecentUsageEntries(10);
     expect(readBack.length).toBe(1);
     expect(readBack[0].requestId).toBe("ocx-enoent-2");
+  });
+
+  test("usage.jsonl is rewritten to the retention window once it crosses the cap", () => {
+    // Earlier tests in this file appended entries; the trim cadence is rate-limited to
+    // one check per second, so reset it to make this test deterministic.
+    resetUsageTrimStateForTests();
+    const paddedRow = JSON.stringify({
+      requestId: "seed",
+      timestamp: 1,
+      provider: "openai",
+      model: "gpt-5.5",
+      status: 200,
+      durationMs: 1,
+      usageStatus: "reported",
+      pad: "p".repeat(1000),
+    });
+    // Seed ~65 MiB so the file crosses USAGE_LOG_MAX_BYTES before the next append.
+    const rowsNeeded = Math.ceil((USAGE_LOG_MAX_BYTES + 1024 * 1024) / (paddedRow.length + 1));
+    writeFileSync(usageLogPath(), `${`${paddedRow}\n`.repeat(rowsNeeded)}`, { mode: 0o600 });
+    expect(statSync(usageLogPath()).size).toBeGreaterThan(USAGE_LOG_MAX_BYTES);
+
+    appendUsageEntry({
+      requestId: "after-trim",
+      timestamp: Date.now(),
+      provider: "openai",
+      model: "gpt-4o",
+      status: 200,
+      durationMs: 5,
+      usageStatus: "unreported",
+    });
+
+    const size = statSync(usageLogPath()).size;
+    // The retained window keeps a healthy tail and stays under the cap, so management
+    // reads (already windowed at 64 MiB) always see the whole file.
+    expect(size).toBeGreaterThan(USAGE_LOG_TRIM_KEEP_BYTES - 4096);
+    expect(size).toBeLessThanOrEqual(USAGE_LOG_MAX_BYTES);
+    // The rewrite lands on a complete JSONL row boundary.
+    expect(readFileSync(usageLogPath()).subarray(0, 1).toString()).toBe("{");
+    // The newest entry survives, reading cleanly from the rewritten file.
+    const readBack = readRecentUsageEntries(1);
+    expect(readBack).toHaveLength(1);
+    expect(readBack[0].requestId).toBe("after-trim");
   });
 });
