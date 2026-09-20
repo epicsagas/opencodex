@@ -190,7 +190,7 @@ function record(kind: string, err: unknown, promise?: unknown): void {
     const summary = `\n[${new Date(now).toISOString()}] benign-abort-teardown x${benignSuppressed}`
       + ` (Bun fetch-body abort; proxy unaffected)${diagnose(err)}${diagnosePromise(promise)}${breadcrumb()}\n`;
     benignSuppressed = 0;
-    try { appendFileSync(crashLogPath(), summary); } catch { /* logging must never throw */ }
+    try { appendFileSync(crashLogPath(), summary, { mode: 0o600 }); } catch { /* logging must never throw */ }
     return; // no stderr banner — this is expected noise, not a crash
   }
   const line = formatCrashEntry(kind, err, promise);
@@ -199,7 +199,7 @@ function record(kind: string, err: unknown, promise?: unknown): void {
   console.error(`⚠️  ${kind} (proxy stayed up; logged to crash.log)`);
   console.error(line.trimStart());
   try {
-    appendFileSync(crashLogPath(), line);
+    appendFileSync(crashLogPath(), line, { mode: 0o600 });
   } catch {
     /* logging must never throw */
   }
