@@ -23,7 +23,7 @@ This launch prompt (source-of-truth #1), the canonical master plan (`devlog/_pla
 - **Final (tip):** recorded in the terminal response below (tip of `fab/00-agent-fabric` after this handoff lands).
 
 ## Branch and repository state
-- Branch `fab/00-agent-fabric` at `C:\Users\ws\opencodex-fab00`, created off `origin/main` (`bbb630e`). Clean tree before commits. `main` untouched. No native Codex/Claude storage mutated.
+- Branch `fab/00-agent-fabric` at `C:\Users\user\opencodex-fab00`, created off `origin/main` (`bbb630e`). Clean tree before commits. `main` untouched. No native Codex/Claude storage mutated.
 
 ## Files changed
 All under `devlog/_plan/800_agent-fabric/`: `010`-`170` (17 documents) + `handoffs/FAB-00.md` + `spikes/spike-a/`, `spikes/spike-b/`, `spikes/spike-c-kernel/` (source + captured output). **No** changes under `src/`, `bin/`, `tests/`, `gui/`, or `scripts/`. ci.yml path filters are not matched.
@@ -53,7 +53,7 @@ Mirrors the repo's existing invariant (`structure/05`: `usage.jsonl` 0o600, neve
 
 ## Deviations
 
-1. The canonical master plan (`000_master_plan.md`) was not pre-present at its repo path; it was **copied** from the provided source file (`C:\Users\ws\Downloads\000_master_plan.md`, 35,085 bytes) per the plan's own sec.0 instruction and as required-output file #1 -- not reconstructed from the launch prompt.
+1. The canonical master plan (`000_master_plan.md`) was not pre-present at its repo path; it was **copied** from the provided source file (`C:\Users\user\Downloads\000_master_plan.md`, 35,085 bytes) per the plan's own sec.0 instruction and as required-output file #1 -- not reconstructed from the launch prompt.
 2. Spike A live `thread/start` not executed (model-spend/auth boundary); `generate-ts` schema is the deterministic primary evidence.
 3. Spike B live headless `claude -p` blocked by an auth/TTY gate; capability confirmed via primary docs and the in-process SDK is the intended path.
 4. Root `AGENTS.md`/`CONTRIBUTING.md`/`MAINTAINERS.md` not found at repo root (`010` sec.4); governance creation is a FAB-01 prerequisite (`170`).
@@ -75,7 +75,7 @@ NOT AUTHORISED. See `170`. Prerequisites: independent acceptance + maintainer la
 
 ## Verification commands / results
 
-- `git -C 'C:\Users\ws\opencodex-fab00' diff --check` -- whitespace clean (docs only).
+- `git -C 'C:\Users\user\opencodex-fab00' diff --check` -- whitespace clean (docs only).
 - `go test ./...` (in `spikes/spike-c-kernel`) -> `ok fab00-spike-c/kernel 0.361s` (8/8 PASS).
 - `go run .` (crash harness) -> all 5 boundaries recover + FINAL verify PASS.
 - `codex app-server generate-ts --out <tmp>` -> full versioned schema generated (Spike A).

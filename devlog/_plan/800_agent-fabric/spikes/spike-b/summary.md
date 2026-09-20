@@ -1,6 +1,6 @@
 Spike B -- Claude structured acknowledgement (live attempt)
 Date: 2026-08-03
-Environment: claude Code 2.1.220 (C:\Users\ws\.local\bin\claude.exe), Windows, temp cwd.
+Environment: claude Code 2.1.220 (C:\Users\user\.local\bin\claude.exe), Windows, temp cwd.
 Command: claude -p --output-format json --max-turns 1 "<prompt requesting strict JSON ack with task_id, workspace_id, base_commit, acceptance_criteria_hash, loss_ledger_hash, adapter, adapter_version, harness, harness_version>"
 
 Result:

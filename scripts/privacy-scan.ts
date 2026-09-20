@@ -7,7 +7,7 @@ type Finding = {
   value: string;
 };
 
-const TEXT_FILE_RE = /\.(?:cjs|css|html|js|json|jsonc|md|mjs|ps1|sh|toml|ts|tsx|txt|yml|yaml)$/;
+const TEXT_FILE_RE = /\.(?:cjs|css|env|html|js|json|jsonc|key|md|mjs|pem|ps1|sh|toml|ts|tsx|txt|yml|yaml)$/;
 const EXCLUDED_PREFIXES = [
   "gui/dist/",
   "node_modules/",
@@ -56,6 +56,14 @@ const DEVLOG_PUBLICATION_PROOF_EMAIL = ["stranger", "third-party.example.org"].j
  */
 const SPONSORSHIP_CONTACT_EMAIL = ["jun", "lidgeai.com"].join("@");
 const SPONSORSHIP_CONTACT_FILES = new Set(["SPONSORS.md", "README.md"]);
+
+/**
+ * The canonical AWS documentation example access key id. It matches the AKIA grammar
+ * the `cloud-token` detector now enforces, but it is a published documentation constant,
+ * not a credential — the same category as the placeholder emails above. Assembled from
+ * fragments so this scanner does not report its own allowances.
+ */
+const AWS_DOCS_EXAMPLE_ACCESS_KEY_ID = ["AKIA", "IOSFODNN7EXAMPLE"].join("");
 
 function gitLsFiles(): string[] {
   const result = Bun.spawnSync(["git", "ls-files"], { stdout: "pipe", stderr: "pipe" });
@@ -136,25 +144,48 @@ function isGitAttributionContext(line: string): boolean {
     // Requires the 7+ hex SHA, so an arbitrary table of contacts is not covered.
     || (/^\s*\|/.test(line) && /\b[0-9a-f]{7,40}\b/.test(line));
 }
+/**
+ * Home-path usernames that do not name a person. Machine accounts (`bun` — official
+ * Docker image home; `runner`/`runneradmin`/`ubuntu` — CI and cloud-image accounts),
+ * fixture and example personas (`alice`, `bob`, `bob2`, `Bob`, `dev`, `other`), single
+ *-letter and abstract placeholders (`x`, `u`, `M`, `me`, `user`, `test`, `example`,
+ * `source`, `target`), and `ERROR` — the literal from the npm error-code hazard
+ * example documented in `src/update/job.ts`. Any REAL username outside this set still
+ * fails, in any directory.
+ */
+const NON_PERSON_HOME_USERNAMES = new Set([
+  "alice", "bob", "bob2", "Bob", "bun", "dev", "ERROR", "example", "me", "M",
+  "Admin", "other", "private", "runner", "runneradmin", "source", "target", "test", "u", "ubuntu",
+  "user", "x",
+]);
+
 function isAllowedHomePath(file: string, username: string): boolean {
   if (file === DEVLOG_PUBLICATION_PROOF_FILE && username === DEVLOG_PUBLICATION_PROOF_HOME_USERNAME) return true;
-  if (file.startsWith("tests/") && (username === "example" || username === "test" || username === "x")) {
-    return true;
-  }
-  if (file.startsWith("docs/") && (username === "me" || username === "user")) return true;
-  if (file.startsWith("docs-site/") && username === "example") return true;
+  if (NON_PERSON_HOME_USERNAMES.has(username)) return true;
   // devlog evidence blocks quote real command invocations, and a reproducible path is
-  // the point. The maintainer's own account name is already public through repository
-  // ownership and commit authorship. Any OTHER username still fails: a contributor's or
-  // reporter's home path is somebody else's data.
-  if (file.startsWith("devlog/") && (username === MAINTAINER_HOME_USERNAME || username === "u" || username === "user" || username === "me" || username === "test")) {
+  // the point. The maintainer's own account names are already public through repository
+  // ownership and commit authorship (`lidgeai` is the organization identity published
+  // on SPONSORS.md). Any OTHER username still fails: a contributor's or reporter's
+  // home path is somebody else's data.
+  if (file.startsWith("devlog/") && (username === MAINTAINER_HOME_USERNAME || username === "lidgeai")) {
     return true;
   }
   return false;
 }
 
+/**
+ * PEM private-key headers inside test code are construction templates or fixture
+ * markers (the GCP ADC fixture generates its key at runtime and embeds only the
+ * header shape), not key material. Outside tests, any private-key header is a
+ * finding that a human has to look at.
+ */
+function isAllowedPrivateKeyHeader(file: string): boolean {
+  return file.startsWith("tests/") || file.startsWith("gui/tests/");
+}
+
 function isAllowedTokenLooking(file: string, token: string): boolean {
   if (file === DEVLOG_PUBLICATION_PROOF_FILE && token === DEVLOG_PUBLICATION_PROOF_TOKEN) return true;
+  if (token === AWS_DOCS_EXAMPLE_ACCESS_KEY_ID) return true;
   if (file.startsWith("tests/")) {
     // Test fixture sentinels: sk-rawsentinel..., sk-test-...
     return /^sk-(?:rawsentinel|test-)\d+[a-z]*$/.test(token);
@@ -276,6 +307,22 @@ export function scanText(file: string, text: string): Finding[] {
     findings,
     file,
     text,
+    "home-path",
+    /(?<![\w/])\/home\/([A-Za-z0-9_-]+)\//g,
+    match => isAllowedHomePath(file, match[1] ?? ""),
+  );
+  addFindingsForPattern(
+    findings,
+    file,
+    text,
+    "home-path",
+    /\\Users\\([A-Za-z0-9_-]+)\\/g,
+    match => isAllowedHomePath(file, match[1] ?? ""),
+  );
+  addFindingsForPattern(
+    findings,
+    file,
+    text,
     "email",
     /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,
     match =>
@@ -357,6 +404,33 @@ export function scanText(file: string, text: string): Finding[] {
     /\bLLM\|\d+\|[A-Za-z0-9_-]{10,}\b/g,
     match => isAllowedTokenLooking(file, match[0]),
   );
+  /*
+   * Cloud and CI platform tokens whose grammar the pre-existing patterns miss:
+   * AWS access-key ids (AKIA + 16 uppercase), Google API keys (AIza + 35 chars),
+   * fine-grained and app/user/server GitHub tokens (gho_/ghs_/ghu_/ghr_; `ghp_`
+   * is already covered by `token-looking`). The measured grammars, never values.
+   */
+  addFindingsForPattern(
+    findings,
+    file,
+    text,
+    "cloud-token",
+    /\b(?:AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|github_pat_[A-Za-z0-9_]{20,}|gh[osur]_[A-Za-z0-9]{20,})\b/g,
+    match => isAllowedTokenLooking(file, match[0]),
+  );
+  /*
+   * PEM private-key block headers. The header itself is not the secret, but any
+   * tracked file carrying one is either a leaked key material or a private-key
+   * fixture the scan should force a human to look at.
+   */
+  addFindingsForPattern(
+    findings,
+    file,
+    text,
+    "private-key",
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----/g,
+    () => isAllowedPrivateKeyHeader(file),
+  );
   return findings;
 }
 
@@ -379,6 +453,7 @@ const REDACTED_FINDING_KINDS = new Set([
   "bearer-token",
   "token-looking",
   "meta-api-key",
+  "cloud-token",
   "ssh-proxy-command",
   // Redacted for the same reason as the ProxyCommand: this scan runs in CI on a
   // public repository, so printing the value would republish the endpoint into a
