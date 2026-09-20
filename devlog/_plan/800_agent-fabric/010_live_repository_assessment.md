@@ -18,7 +18,7 @@ base_branch: fab/00-agent-fabric (from origin/main @ f9b9440, v2.10.0)
 
 - `origin` = github.com/lidge-jun/opencodex ; `fork` = github.com/Wibias/opencodex.
 - Origin branches: `main`, `dev`, `dev-B`, `preview`, `codex/gpt-56-sol-terra-luna-rollout`, `cursor-fixes`, `cursor-provider-stack`, `ingw/fix-provider-error-classification`.
-- FAB-00 worktree: `C:\Users\ws\opencodex-fab00` on branch `fab/00-agent-fabric` from current `origin/main` (`f9b9440`, v2.10.0) -- initially created at the stale `bbb630e` ref, then `git reset --hard origin/main` applied after a fetch revealed current main at v2.10.0. Main checkout `C:\Users\ws\opencodex` on `fix/cursor-multi-account-oauth` (clean). No other worktrees pre-existing.
+- FAB-00 worktree: `C:\Users\user\opencodex-fab00` on branch `fab/00-agent-fabric` from current `origin/main` (`f9b9440`, v2.10.0) -- initially created at the stale `bbb630e` ref, then `git reset --hard origin/main` applied after a fetch revealed current main at v2.10.0. Main checkout `C:\Users\user\opencodex` on `fix/cursor-multi-account-oauth` (clean). No other worktrees pre-existing.
 - Branch policy (`ci.yml`): PRs target `main`/`dev`; `dev` is the normal integration line; `preview` stages `dev-B` merges.
 
 ## 3. Source-of-truth documents (read in full)
