@@ -119,7 +119,7 @@ function getKimiCommonHeaders(): Record<string, string> {
     "User-Agent": `KimiCLI/${KIMI_CLI_VERSION}`,
     "X-Msh-Platform": "kimi_code_cli",
     "X-Msh-Version": KIMI_CLI_VERSION,
-    "X-Msh-Device-Name": os.hostname(),
+    "X-Msh-Device-Name": process.env.KIMI_DEVICE_NAME || os.hostname(),
     "X-Msh-Device-Model": getDeviceModel(),
     "X-Msh-Os-Version": os.version(),
     "X-Msh-Device-Id": getDeviceId(),
