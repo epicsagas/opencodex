@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { browserSecurityHeaders } from "./auth-cors";
@@ -112,13 +113,27 @@ function runtimeRoleMeta(runtimeRole: string): string {
 function managementAuthRequiredMeta(required: boolean): string {
   return `<meta name="opencodex-management-auth-required" content="${required ? "1" : "0"}">`;
 }
+/**
+ * CSP source expressions for the document's inline `<script>` blocks (the build's
+ * FOWT theme bootstrap). Hashes are computed from the exact bytes being served, so a
+ * rebuilt gui/dist whose inline content changed keeps passing without regenerating a
+ * checked-in hash. `<script src=…>` tags are excluded — `script-src 'self'` covers them.
+ */
+function inlineScriptHashes(html: string): string[] {
+  const hashes: string[] = [];
+  for (const match of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) {
+    hashes.push(`'sha256-${createHash("sha256").update(match[1] ?? "").digest("base64")}'`);
+  }
+  return hashes;
+}
+
 function htmlDocumentResponse(html: string): Response {
   return new Response(html, {
     headers: {
       "Content-Type": "text/html",
       "Cache-Control": "no-store",
       Pragma: "no-cache",
-      ...browserSecurityHeaders(),
+      ...browserSecurityHeaders({ scriptSrcHashes: inlineScriptHashes(html) }),
     },
   });
 }

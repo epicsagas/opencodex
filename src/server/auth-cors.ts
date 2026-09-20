@@ -170,10 +170,22 @@ export function isAllowedManagementOrigin(req: Request, config: OcxConfig): bool
   return !origin || origin === requestOrigin || isExtraAllowedOrigin(origin, config);
 }
 
-export function browserSecurityHeaders(): Record<string, string> {
+/**
+ * Baseline browser hardening for every browser-reachable response.
+ *
+ * `script-src 'self'` keeps an injected inline or off-origin script from running even
+ * if the dashboard ever ships an XSS: the session and CSRF tokens travel in the DOM
+ * (`gui-static.ts`), so script execution is the whole game for an attacker. HTML
+ * responses pass `scriptSrcHashes` — one `'sha256-…'` expression per inline `<script>`
+ * block in the exact document being served — so the build's own bootstrap scripts keep
+ * running without weakening the policy for anything else. JSON and asset responses
+ * never declare script sources beyond 'self'; the directive is inert there.
+ */
+export function browserSecurityHeaders(options?: { scriptSrcHashes?: string[] }): Record<string, string> {
+  const scriptSource = ["'self'", ...(options?.scriptSrcHashes ?? [])].join(" ");
   return {
     "X-Frame-Options": "DENY",
-    "Content-Security-Policy": "frame-ancestors 'none'",
+    "Content-Security-Policy": `frame-ancestors 'none'; script-src ${scriptSource}`,
   };
 }
 
