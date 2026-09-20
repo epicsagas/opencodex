@@ -231,10 +231,12 @@ function renderPrompt(current: string, latest: string, channel: Channel): string
 /**
  * Interactive-only update prompt for `ocx start`. Must be called BEFORE the
  * server binds a port / writes a PID, because "Update now" installs globally
- * and exits. No-op for service/daemon/non-TTY runs and source checkouts.
- * Never throws.
+ * and exits. No-op for service/daemon/non-TTY runs and source checkouts, and
+ * when the operator disabled update checks (`updateCheck` config or
+ * OPENCODEX_UPDATE_CHECK=0). Never throws.
  */
-export async function maybeShowUpdatePrompt(): Promise<void> {
+export async function maybeShowUpdatePrompt(updateChecksEnabled = true): Promise<void> {
+  if (!updateChecksEnabled) return;
   try {
     const eligible = shouldConsider();
     if (!eligible) return;

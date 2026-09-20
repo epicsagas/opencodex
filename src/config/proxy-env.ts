@@ -21,6 +21,15 @@ export function codexShimAutoRestoreEnabled(
   return config.codexShimAutoRestore !== false && env[CODEX_SHIM_AUTO_RESTORE_ENV] !== "0";
 }
 
+export const UPDATE_CHECK_ENV = "OPENCODEX_UPDATE_CHECK";
+
+export function updateCheckEnabled(
+  config: Pick<OcxConfig, "updateCheck">,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return config.updateCheck !== false && env[UPDATE_CHECK_ENV] !== "0";
+}
+
 export function multiAgentGuidanceEnabled(
   config: Pick<OcxConfig, "multiAgentGuidanceEnabled">,
 ): boolean {

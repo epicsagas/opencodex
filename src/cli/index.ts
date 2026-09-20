@@ -42,6 +42,7 @@ import {
   loadConfig,
   saveConfig,
 } from "../config";
+import { updateCheckEnabled } from "../config/proxy-env";
 import {
   isLikelyOcxProcess,
   readPid,
@@ -441,7 +442,7 @@ async function handleStart(options: { block?: boolean } = {}) {
   // Interactive-only update prompt. Must run BEFORE we bind a port / write a
   // PID: choosing "Update now" installs globally and exits, so we never want a
   // live daemon holding resources while it overwrites its own binary.
-  await maybeShowUpdatePrompt();
+  await maybeShowUpdatePrompt(updateCheckEnabled(loadConfig()));
 
   // Port selection is check-then-bind: a concurrent `ocx start`/`ensure` can win the port
   // between the probe and Bun.serve. Soft starts may re-pick; hard-pinned `--port` retries

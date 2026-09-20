@@ -190,6 +190,7 @@ export const configSchema = z.object({
     z.array(z.string().trim().min(1)).min(1),
   ).optional().catch(undefined),
   codexShimAutoRestore: z.boolean().optional(),
+  updateCheck: z.boolean().optional(),
   codexDesktopAuthless: z.boolean().optional().catch(undefined),
   codexClientCompaction: z.boolean().optional().catch(undefined),
   // Presentation-only label for the injected provider. A malformed value degrades to undefined
